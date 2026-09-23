@@ -12,16 +12,13 @@ public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, bool>
 {
     private readonly IUserRepository _userRepository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IScimService _scimService;
 
     public DeleteUserCommandHandler(
         IUserRepository userRepository,
-        IUnitOfWork unitOfWork,
-        IScimService scimService)
+        IUnitOfWork unitOfWork)
     {
         _userRepository = userRepository;
         _unitOfWork = unitOfWork;
-        _scimService = scimService;
     }
 
     public async Task<bool> Handle(DeleteUserCommand request, CancellationToken cancellationToken)
@@ -32,18 +29,6 @@ public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, bool>
         user.Status = UserStatus.Deleted;
         await _userRepository.UpdateAsync(user, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        if (!string.IsNullOrEmpty(user.ExternalId))
-        {
-            try
-            {
-                await _scimService.DeleteUserAsync(user.ExternalId, cancellationToken);
-            }
-            catch
-            {
-                // Non-blocking
-            }
-        }
 
         return true;
     }

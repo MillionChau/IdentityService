@@ -20,7 +20,7 @@ public static class DependencyInjection
     {
         // Settings configuration
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
-        services.Configure<Wso2Settings>(configuration.GetSection(Wso2Settings.SectionName));
+        services.Configure<OAuthSettings>(configuration.GetSection(OAuthSettings.SectionName));
 
         var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>() ?? new JwtSettings();
 
@@ -49,8 +49,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
-        services.AddScoped<IWso2Service, Wso2Service>();
-        services.AddScoped<IScimService, ScimService>();
+        services.AddScoped<IOAuthService, OAuthService>();
 
         // JWT Bearer Authentication
         services.AddAuthentication(options =>
