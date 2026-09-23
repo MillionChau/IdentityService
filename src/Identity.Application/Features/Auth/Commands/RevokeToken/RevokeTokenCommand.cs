@@ -12,16 +12,13 @@ public record RevokeTokenCommand : IRequest<bool>
 public class RevokeTokenCommandHandler : IRequestHandler<RevokeTokenCommand, bool>
 {
     private readonly IRefreshTokenRepository _refreshTokenRepository;
-    private readonly IWso2Service _wso2Service;
     private readonly IUnitOfWork _unitOfWork;
 
     public RevokeTokenCommandHandler(
         IRefreshTokenRepository refreshTokenRepository,
-        IWso2Service wso2Service,
         IUnitOfWork unitOfWork)
     {
         _refreshTokenRepository = refreshTokenRepository;
-        _wso2Service = wso2Service;
         _unitOfWork = unitOfWork;
     }
 
@@ -33,15 +30,6 @@ public class RevokeTokenCommandHandler : IRequestHandler<RevokeTokenCommand, boo
             stored.IsRevoked = true;
             await _refreshTokenRepository.UpdateAsync(stored, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
-        }
-
-        try
-        {
-            await _wso2Service.RevokeTokenAsync(request.Token, cancellationToken);
-        }
-        catch
-        {
-            // Ignore WSO2 revoke error if unreachable
         }
 
         return true;

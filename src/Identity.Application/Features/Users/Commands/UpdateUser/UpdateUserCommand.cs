@@ -21,18 +21,15 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, UserD
 {
     private readonly IUserRepository _userRepository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IScimService _scimService;
     private readonly IMapper _mapper;
 
     public UpdateUserCommandHandler(
         IUserRepository userRepository,
         IUnitOfWork unitOfWork,
-        IScimService scimService,
         IMapper mapper)
     {
         _userRepository = userRepository;
         _unitOfWork = unitOfWork;
-        _scimService = scimService;
         _mapper = mapper;
     }
 
@@ -55,15 +52,6 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, UserD
 
         await _userRepository.UpdateAsync(user, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        try
-        {
-            await _scimService.UpdateUserAsync(user, cancellationToken);
-        }
-        catch
-        {
-            // Non-blocking SCIM sync
-        }
 
         return _mapper.Map<UserDto>(user);
     }

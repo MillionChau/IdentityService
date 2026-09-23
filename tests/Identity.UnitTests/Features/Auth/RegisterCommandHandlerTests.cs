@@ -15,7 +15,6 @@ public class RegisterCommandHandlerTests
     private readonly Mock<IPasswordHasher> _hasherMock;
     private readonly Mock<IJwtTokenService> _jwtServiceMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
-    private readonly Mock<IScimService> _scimServiceMock;
     private readonly RegisterCommandHandler _handler;
 
     public RegisterCommandHandlerTests()
@@ -24,14 +23,12 @@ public class RegisterCommandHandlerTests
         _hasherMock = new Mock<IPasswordHasher>();
         _jwtServiceMock = new Mock<IJwtTokenService>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
-        _scimServiceMock = new Mock<IScimService>();
 
         _handler = new RegisterCommandHandler(
             _userRepoMock.Object,
             _hasherMock.Object,
             _jwtServiceMock.Object,
-            _unitOfWorkMock.Object,
-            _scimServiceMock.Object);
+            _unitOfWorkMock.Object);
     }
 
     [Fact]

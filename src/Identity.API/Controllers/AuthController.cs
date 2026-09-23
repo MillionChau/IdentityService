@@ -6,10 +6,9 @@ using Identity.Application.Features.Auth.Commands.Login;
 using Identity.Application.Features.Auth.Commands.RefreshToken;
 using Identity.Application.Features.Auth.Commands.Register;
 using Identity.Application.Features.Auth.Commands.RevokeToken;
-using Identity.Application.Features.Auth.Commands.Wso2ExchangeToken;
-using Identity.Application.Features.Auth.Commands.Wso2RenewToken;
+using Identity.Application.Features.Auth.Commands.OAuthLogin;
 using Identity.Application.Features.Auth.Queries.GetCurrentUser;
-using Identity.Application.Features.Auth.Queries.GetWso2AuthorizeUrl;
+using Identity.Application.Features.Auth.Queries.GetOAuthAuthorizeUrl;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -123,57 +122,48 @@ public class AuthController : ApiControllerBase
     }
 
     // ==========================================
-    // WSO2 OAuth2 / OpenID Connect Endpoints (Kế thừa từ IdentityService csdl-hn-net)
+    // OAuth2 Endpoints (GitHub, Google) cho DevRadar
     // ==========================================
 
     /// <summary>
-    /// Lấy URL đăng nhập qua máy chủ WSO2 Identity Server
+    /// Lấy URL chuyển hướng người dùng đến trang đăng nhập của nhà cung cấp OAuth2 (vd: github, google)
     /// </summary>
-    [HttpGet("wso2/authorize-url")]
+    [HttpGet("oauth/{provider}/authorize-url")]
     [ProducesResponseType(typeof(ResponseModel<string>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetWso2AuthorizeUrl([FromQuery] string? state, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(ResponseModel<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetOAuthAuthorizeUrl([FromRoute] string provider, [FromQuery] string? state, CancellationToken cancellationToken)
     {
-        var url = await Mediator.Send(new GetWso2AuthorizeUrlQuery { State = state }, cancellationToken);
+        var url = await Mediator.Send(new GetOAuthAuthorizeUrlQuery { Provider = provider, State = state }, cancellationToken);
         return Ok(ResponseModel<string>.Success(url));
     }
 
     /// <summary>
-    /// API lấy token từ hệ thống WSO2 sau khi có Authorization Code (Tương thích endpoint /connection/token cũ)
+    /// Callback từ nhà cung cấp OAuth2 sau khi người dùng chấp thuận cấp quyền
     /// </summary>
-    [HttpGet("connection/token")]
-    [ProducesResponseType(typeof(ResponseModel<Wso2TokenDto>), StatusCodes.Status200OK)]
+    [HttpGet("oauth/{provider}/callback")]
+    [ProducesResponseType(typeof(ResponseModel<AuthResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ResponseModel<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ConnectWso2Token([FromQuery] string code, CancellationToken cancellationToken)
+    public async Task<IActionResult> OAuthCallback([FromRoute] string provider, [FromQuery] string code, [FromQuery] string? state, CancellationToken cancellationToken)
     {
-        var response = await Mediator.Send(new Wso2ExchangeTokenCommand { Code = code }, cancellationToken);
-        return Ok(ResponseModel<Wso2TokenDto>.Success(response, "Đổi mã WSO2 thành công."));
-    }
-
-    /// <summary>
-    /// Callback nhận authorization code từ WSO2
-    /// </summary>
-    [HttpGet("wso2/callback")]
-    [ProducesResponseType(typeof(ResponseModel<Wso2TokenDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Wso2Callback([FromQuery] string code, [FromQuery] string? state, CancellationToken cancellationToken)
-    {
-        var response = await Mediator.Send(new Wso2ExchangeTokenCommand { Code = code }, cancellationToken);
-        return Ok(ResponseModel<Wso2TokenDto>.Success(response, "Xác thực WSO2 thành công."));
-    }
-
-    /// <summary>
-    /// Gia hạn phiên đăng nhập WSO2 mà không bắt người dùng đăng nhập lại (Tương thích /connection/token/renew)
-    /// </summary>
-    [HttpPost("connection/token/renew")]
-    [ProducesResponseType(typeof(ResponseModel<Wso2TokenDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ResponseModel<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> RenewWso2Token([FromForm] string? accessToken, [FromForm] string? refreshToken, CancellationToken cancellationToken)
-    {
-        var response = await Mediator.Send(new Wso2RenewTokenCommand
+        var response = await Mediator.Send(new OAuthLoginCommand
         {
-            AccessToken = accessToken,
-            RefreshToken = refreshToken
+            Provider = provider,
+            Code = code
         }, cancellationToken);
 
-        return Ok(ResponseModel<Wso2TokenDto>.Success(response, "Gia hạn phiên WSO2 thành công."));
+        return Ok(ResponseModel<AuthResponseDto>.Success(response, $"Xác thực {provider} OAuth2 thành công."));
+    }
+
+    /// <summary>
+    /// API tiếp nhận mã Authorization Code từ Frontend SPA / Mobile Client để hoàn tất đăng nhập OAuth2
+    /// </summary>
+    [HttpPost("oauth/{provider}/login")]
+    [ProducesResponseType(typeof(ResponseModel<AuthResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ResponseModel<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> OAuthLogin([FromRoute] string provider, [FromBody] OAuthLoginCommand command, CancellationToken cancellationToken)
+    {
+        var commandWithProvider = command with { Provider = provider };
+        var response = await Mediator.Send(commandWithProvider, cancellationToken);
+        return Ok(ResponseModel<AuthResponseDto>.Success(response, $"Đăng nhập {provider} OAuth2 thành công."));
     }
 }

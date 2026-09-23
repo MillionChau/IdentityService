@@ -45,20 +45,17 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IScimService _scimService;
 
     public RegisterCommandHandler(
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
         IJwtTokenService jwtTokenService,
-        IUnitOfWork unitOfWork,
-        IScimService scimService)
+        IUnitOfWork unitOfWork)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
         _unitOfWork = unitOfWork;
-        _scimService = scimService;
     }
 
     public async Task<AuthResponseDto> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -88,15 +85,6 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
 
         await _userRepository.AddAsync(user, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        try
-        {
-            await _scimService.CreateUserAsync(user, request.Password, cancellationToken);
-        }
-        catch
-        {
-            // Graceful non-blocking WSO2 sync
-        }
 
         var roles = new List<string> { "User" };
         var permissions = new List<string>();
