@@ -9,6 +9,8 @@ using Identity.Application.Features.Auth.Commands.RevokeToken;
 using Identity.Application.Features.Auth.Commands.OAuthLogin;
 using Identity.Application.Features.Auth.Queries.GetCurrentUser;
 using Identity.Application.Features.Auth.Queries.GetOAuthAuthorizeUrl;
+using Identity.Application.Features.Auth.Commands.ForgotPassword;
+using Identity.Application.Features.Auth.Commands.ResetPassword;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -119,6 +121,31 @@ public class AuthController : ApiControllerBase
 
         var result = await Mediator.Send(command, cancellationToken);
         return Ok(ResponseModel<bool>.Success(result, "Đổi mật khẩu thành công."));
+    }
+
+    /// <summary>
+    /// Yêu cầu khôi phục mật khẩu qua Email (UC-04)
+    /// </summary>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordCommand command, CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(command, cancellationToken);
+        return Ok(ResponseModel<bool>.Success(result, "Hướng dẫn khôi phục mật khẩu đã được gửi đến email (nếu tài khoản tồn tại)."));
+    }
+
+    /// <summary>
+    /// Xác thực mã và thiết lập lại mật khẩu mới (UC-04)
+    /// </summary>
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ResponseModel<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordCommand command, CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(command, cancellationToken);
+        return Ok(ResponseModel<bool>.Success(result, "Mật khẩu đã được thiết lập lại thành công."));
     }
 
     // ==========================================
