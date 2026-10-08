@@ -4,32 +4,29 @@ using Identity.Domain.Contracts;
 using Identity.Domain.Enums;
 using MediatR;
 
-namespace Identity.Application.Features.Users.Commands.DeleteUser;
+namespace Identity.Application.Features.Users.Commands.LockUser;
 
-public record DeleteUserCommand(Guid Id) : IRequest<bool>;
+public record LockUserCommand(Guid Id) : IRequest<bool>;
 
-public class DeleteUserCommandHandler : IRequestHandler<DeleteUserCommand, bool>
+public class LockUserCommandHandler : IRequestHandler<LockUserCommand, bool>
 {
     private readonly IUserRepository _userRepository;
     private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteUserCommandHandler(
-        IUserRepository userRepository,
-        IUnitOfWork unitOfWork)
+    public LockUserCommandHandler(IUserRepository userRepository, IUnitOfWork unitOfWork)
     {
         _userRepository = userRepository;
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<bool> Handle(DeleteUserCommand request, CancellationToken cancellationToken)
+    public async Task<bool> Handle(LockUserCommand request, CancellationToken cancellationToken)
     {
         var user = await _userRepository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException("User", request.Id);
 
-        user.Status = UserStatus.Deleted;
+        user.Status = UserStatus.Locked;
         await _userRepository.UpdateAsync(user, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-
         return true;
     }
 }

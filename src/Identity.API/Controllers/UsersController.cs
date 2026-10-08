@@ -1,6 +1,8 @@
 using Identity.Application.Common.Models;
 using Identity.Application.DTOs;
 using Identity.Application.Features.Users.Commands.DeleteUser;
+using Identity.Application.Features.Users.Commands.LockUser;
+using Identity.Application.Features.Users.Commands.UnlockUser;
 using Identity.Application.Features.Users.Commands.UpdateUser;
 using Identity.Application.Features.Users.Queries.GetUserById;
 using Identity.Application.Features.Users.Queries.GetUsersByFilter;
@@ -74,5 +76,27 @@ public class UsersController : ApiControllerBase
     {
         var result = await Mediator.Send(new DeleteUserCommand(id), cancellationToken);
         return Ok(ResponseModel<bool>.Success(result, "Xoá người dùng thành công."));
+    }
+
+    /// <summary>
+    /// Khóa tài khoản người dùng vi phạm (Admin - UC-66)
+    /// </summary>
+    [HttpPost("{id:guid}/lock")]
+    [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> LockUser(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new LockUserCommand(id), cancellationToken);
+        return Ok(ResponseModel<bool>.Success(result, "Tài khoản đã được khóa thành công."));
+    }
+
+    /// <summary>
+    /// Mở khóa tài khoản người dùng (Admin - UC-66)
+    /// </summary>
+    [HttpPost("{id:guid}/unlock")]
+    [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UnlockUser(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new UnlockUserCommand(id), cancellationToken);
+        return Ok(ResponseModel<bool>.Success(result, "Tài khoản đã được mở khóa thành công."));
     }
 }
