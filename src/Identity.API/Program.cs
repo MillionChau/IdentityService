@@ -2,6 +2,7 @@ using Identity.API.Middleware;
 using Identity.Application;
 using Identity.Infrastructure;
 using Microsoft.OpenApi;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +29,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Request logging: đặt ĐẦU pipeline để log mọi request kèm thời gian phản hồi
+app.UseMiddleware<RequestLoggingMiddleware>();
+
 // Custom Global Exception Handler Middleware
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
@@ -48,6 +52,13 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapGet("/healthz", () => Results.Ok(new { status = "Healthy", service = "IdentityService", timestamp = DateTime.UtcNow }));
+
+// Auto-migrate database on startup (cần thiết khi chạy trong Docker container)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<Identity.Infrastructure.Persistence.IdentityDbContext>();
+    db.Database.Migrate();
+}
 
 app.Run();
 
