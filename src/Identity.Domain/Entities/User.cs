@@ -21,4 +21,5 @@ public class User : AuditableEntity, IAggregateRoot
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     public ICollection<UserExternalLogin> ExternalLogins { get; set; } = new List<UserExternalLogin>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+    public virtual UserPrivacySetting? PrivacySetting { get; set; }
 }

@@ -80,7 +80,15 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
             PhoneNumber = request.PhoneNumber?.Trim(),
             Address = request.Address?.Trim(),
             Status = UserStatus.Active,
-            PrimaryProvider = AuthProvider.Local
+            PrimaryProvider = AuthProvider.Local,
+            PrivacySetting = new UserPrivacySetting
+            {
+                IsProfilePublic = true,
+                ShowEmail = false,
+                ShowPhoneNumber = false,
+                ShowGitHubStats = true,
+                ShowActivityStats = true
+            }
         };
 
         await _userRepository.AddAsync(user, cancellationToken);

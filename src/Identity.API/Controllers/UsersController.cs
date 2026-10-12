@@ -6,7 +6,11 @@ using Identity.Application.Features.Users.Commands.UnlockUser;
 using Identity.Application.Features.Users.Commands.UpdateUser;
 using Identity.Application.Features.Users.Queries.GetUserById;
 using Identity.Application.Features.Users.Queries.GetUsersByFilter;
+using Identity.Application.Features.Privacy.Commands.UpdateUserPrivacy;
+using Identity.Application.Features.Privacy.Queries.GetMyPrivacySettings;
+using Identity.Application.Features.Users.Queries.GetUserPublicProfile;
 using Identity.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Identity.API.Controllers;
@@ -98,5 +102,52 @@ public class UsersController : ApiControllerBase
     {
         var result = await Mediator.Send(new UnlockUserCommand(id), cancellationToken);
         return Ok(ResponseModel<bool>.Success(result, "Tài khoản đã được mở khóa thành công."));
+    }
+
+    /// <summary>
+    /// Lấy cài đặt quyền riêng tư của tài khoản đang đăng nhập (UC-09)
+    /// </summary>
+    [HttpGet("me/privacy")]
+    [Authorize]
+    [ProducesResponseType(typeof(ResponseModel<UserPrivacySettingDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMyPrivacySettings(CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new GetMyPrivacySettingsQuery(), cancellationToken);
+        return Ok(ResponseModel<UserPrivacySettingDto>.Success(result));
+    }
+
+    /// <summary>
+    /// Cập nhật cài đặt quyền riêng tư của tài khoản đang đăng nhập (UC-09)
+    /// </summary>
+    [HttpPut("me/privacy")]
+    [Authorize]
+    [ProducesResponseType(typeof(ResponseModel<UserPrivacySettingDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ResponseModel<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateMyPrivacySettings([FromBody] UpdateUserPrivacySettingDto dto, CancellationToken cancellationToken)
+    {
+        var command = new UpdateUserPrivacyCommand
+        {
+            IsProfilePublic = dto.IsProfilePublic,
+            ShowEmail = dto.ShowEmail,
+            ShowPhoneNumber = dto.ShowPhoneNumber,
+            ShowGitHubStats = dto.ShowGitHubStats,
+            ShowActivityStats = dto.ShowActivityStats
+        };
+
+        var result = await Mediator.Send(command, cancellationToken);
+        return Ok(ResponseModel<UserPrivacySettingDto>.Success(result, "Cập nhật quyền riêng tư thành công."));
+    }
+
+    /// <summary>
+    /// Xem hồ sơ công khai của thành viên khác (UC-07 - Đã áp dụng Privacy Filter)
+    /// </summary>
+    [HttpGet("{id:guid}/profile")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ResponseModel<PublicUserProfileDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ResponseModel<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetUserPublicProfile(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new GetUserPublicProfileQuery(id), cancellationToken);
+        return Ok(ResponseModel<PublicUserProfileDto>.Success(result));
     }
 }
