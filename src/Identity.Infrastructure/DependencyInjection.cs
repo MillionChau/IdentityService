@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IMenuRepository, MenuRepository>();
+        services.AddScoped<IUserPrivacyRepository, UserPrivacyRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Application Services

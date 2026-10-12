@@ -47,6 +47,7 @@ public class UserRepository : BaseRepository<User>, IUserRepository
             .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
             .Include(u => u.ExternalLogins)
             .Include(u => u.RefreshTokens)
+            .Include(u => u.PrivacySetting)
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
     }
 
@@ -57,6 +58,7 @@ public class UserRepository : BaseRepository<User>, IUserRepository
                 .ThenInclude(ur => ur.Role)
                     .ThenInclude(r => r.RolePermissions)
                         .ThenInclude(rp => rp.Permission)
+            .Include(u => u.PrivacySetting)
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
     }
 

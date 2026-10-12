@@ -16,5 +16,10 @@ public class MappingProfile : Profile
             .ForMember(d => d.Children, opt => opt.MapFrom(s => s.Children));
 
         CreateMap<Permission, PermissionDto>();
+
+        CreateMap<UserPrivacySetting, UserPrivacySettingDto>();
+
+        CreateMap<User, PublicUserProfileDto>()
+            .ForMember(d => d.Roles, opt => opt.MapFrom(s => s.UserRoles.Select(ur => ur.Role.Name)));
     }
 }

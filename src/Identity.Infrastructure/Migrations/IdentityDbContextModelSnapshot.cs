@@ -346,6 +346,50 @@ namespace Identity.Infrastructure.Migrations
                     b.ToTable("UserExternalLogins", (string)null);
                 });
 
+            modelBuilder.Entity("Identity.Domain.Entities.UserPrivacySetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsProfilePublic")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("ShowActivityStats")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ShowEmail")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ShowGitHubStats")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ShowPhoneNumber")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("UserPrivacySettings", (string)null);
+                });
+
             modelBuilder.Entity("Identity.Domain.Entities.UserRole", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -427,6 +471,17 @@ namespace Identity.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Identity.Domain.Entities.UserPrivacySetting", b =>
+                {
+                    b.HasOne("Identity.Domain.Entities.User", "User")
+                        .WithOne("PrivacySetting")
+                        .HasForeignKey("Identity.Domain.Entities.UserPrivacySetting", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Identity.Domain.Entities.UserRole", b =>
                 {
                     b.HasOne("Identity.Domain.Entities.Role", "Role")
@@ -466,6 +521,8 @@ namespace Identity.Infrastructure.Migrations
             modelBuilder.Entity("Identity.Domain.Entities.User", b =>
                 {
                     b.Navigation("ExternalLogins");
+
+                    b.Navigation("PrivacySetting");
 
                     b.Navigation("RefreshTokens");
 

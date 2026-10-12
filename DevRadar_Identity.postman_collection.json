@@ -1,0 +1,1050 @@
+{
+  "info": {
+    "_postman_id": "a91b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
+    "name": "DevRadar - Identity Service Automated Test Suite",
+    "description": "Bộ kiểm thử tự động (Automated Test Suite) toàn diện cho IdentityService của DevRadar. Hỗ trợ chạy liên hoàn chuỗi API (Chaining Workflow) với Postman Collection Runner hoặc Newman CLI.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5002",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testUserName",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "initialPassword",
+      "value": "Password123@",
+      "type": "string"
+    },
+    {
+      "key": "newPassword",
+      "value": "NewSecurePassword456@",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. System & Health Check",
+      "item": [
+        {
+          "name": "1.1. Health Check Endpoint",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Health status is Healthy\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"Healthy\");",
+                  "    pm.expect(jsonData.service).to.eql(\"IdentityService\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/healthz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "healthz"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Authentication Flow (Chained Workflow)",
+      "item": [
+        {
+          "name": "2.1. Register New User (Tự sinh dữ liệu ngẫu nhiên)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Tự động tạo timestamp ngẫu nhiên để không bị trùng tài khoản giữa các lần chạy",
+                  "const randomId = Date.now().toString().slice(-6);",
+                  "const userName = 'tester_' + randomId;",
+                  "const email = 'tester_' + randomId + '@devradar.local';",
+                  "",
+                  "pm.collectionVariables.set('testUserName', userName);",
+                  "pm.collectionVariables.set('testEmail', email);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK (Register Success)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Response model indicates success\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data).to.have.property('user');",
+                  "    pm.expect(jsonData.data).to.have.property('tokens');",
+                  "});",
+                  "",
+                  "// Trích xuất UserId, AccessToken và RefreshToken để chuyển tiếp cho các request sau",
+                  "if (jsonData.isSuccess && jsonData.data) {",
+                  "    pm.collectionVariables.set('userId', jsonData.data.user.id);",
+                  "    pm.collectionVariables.set('accessToken', jsonData.data.tokens.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', jsonData.data.tokens.refreshToken);",
+                  "    console.log('User registered with ID: ' + jsonData.data.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"{{testUserName}}\",\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{initialPassword}}\",\n  \"firstName\": \"Auto\",\n  \"lastName\": \"Tester\",\n  \"phoneNumber\": \"0987654321\",\n  \"address\": \"Ha Noi, Viet Nam\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.2. Login with Registered Account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK (Login Success)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Tokens are returned on login\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data.tokens.accessToken).to.be.a('string');",
+                  "    pm.expect(jsonData.data.tokens.refreshToken).to.be.a('string');",
+                  "});",
+                  "",
+                  "// Cập nhật lại token mới nhất",
+                  "pm.collectionVariables.set('accessToken', jsonData.data.tokens.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', jsonData.data.tokens.refreshToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userNameOrEmail\": \"{{testUserName}}\",\n  \"password\": \"{{initialPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.3. Get Current User Profile (/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Profile matches registered user\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data.userName).to.eql(pm.collectionVariables.get('testUserName'));",
+                  "    pm.expect(jsonData.data.email).to.eql(pm.collectionVariables.get('testEmail'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.4. Refresh JWT Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK (Token Refreshed)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"New access and refresh tokens returned\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data.accessToken).to.be.a('string');",
+                  "    pm.expect(jsonData.data.refreshToken).to.be.a('string');",
+                  "});",
+                  "",
+                  "// Lưu token mới làm phiên hoạt động tiếp theo",
+                  "pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', jsonData.data.refreshToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{accessToken}}\",\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh-token"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.5. Change Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK (Password Changed)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Password change confirmed\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{initialPassword}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "change-password"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.6. Verify Login with New Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK (Login with New Password)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Success and new session tokens granted\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data.tokens.accessToken).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('accessToken', jsonData.data.tokens.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', jsonData.data.tokens.refreshToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userNameOrEmail\": \"{{testEmail}}\",\n  \"password\": \"{{newPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.7. Logout / Revoke Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK (Logout Success)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Logout message confirms revocation\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. OAuth2 Endpoints",
+      "item": [
+        {
+          "name": "3.1. Get GitHub OAuth2 Authorize URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Returns valid GitHub authorization URL\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data).to.include(\"https://github.com/login/oauth/authorize\");",
+                  "    pm.expect(jsonData.data).to.include(\"client_id=\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/oauth/github/authorize-url?state=test_state_123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "oauth",
+                "github",
+                "authorize-url"
+              ],
+              "query": [
+                {
+                  "key": "state",
+                  "value": "test_state_123"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.2. Get Google OAuth2 Authorize URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Returns valid Google authorization URL\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data).to.include(\"accounts.google.com/o/oauth2/v2/auth\");",
+                  "    pm.expect(jsonData.data).to.include(\"client_id=\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/oauth/google/authorize-url?state=test_state_456",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "oauth",
+                "google",
+                "authorize-url"
+              ],
+              "query": [
+                {
+                  "key": "state",
+                  "value": "test_state_456"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. User Management API",
+      "item": [
+        {
+          "name": "4.1. Get User List by Filter",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Returns user list\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users?searchTerm={{testUserName}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "searchTerm",
+                  "value": "{{testUserName}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.2. Get User Detail by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"User details match current test user\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data.id).to.eql(pm.collectionVariables.get('userId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.3. Update User Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK (User Updated)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Profile fields updated successfully\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data.firstName).to.eql(\"UpdatedAuto\");",
+                  "    pm.expect(jsonData.data.phoneNumber).to.eql(\"0911223344\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"UpdatedAuto\",\n  \"lastName\": \"UpdatedTester\",\n  \"phoneNumber\": \"0911223344\",\n  \"avatarUrl\": \"https://devradar.local/avatars/test.png\",\n  \"address\": \"Da Nang, Viet Nam\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.4. Delete User (Soft Delete)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK (User Deleted)\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Delete result is true\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.5. Get My Privacy Settings (UC-09)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/privacy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "privacy"
+              ]
+            },
+            "description": "Lấy cấu hình quyền riêng tư hiện tại của người dùng đang đăng nhập (UC-09)"
+          },
+          "response": []
+        },
+        {
+          "name": "4.6. Update My Privacy Settings (UC-09)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isProfilePublic\": true,\n  \"showEmail\": false,\n  \"showPhoneNumber\": false,\n  \"showGitHubStats\": true,\n  \"showActivityStats\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/privacy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me",
+                "privacy"
+              ]
+            },
+            "description": "Cập nhật cấu hình quyền riêng tư cá nhân (UC-09)"
+          },
+          "response": []
+        },
+        {
+          "name": "4.7. Get Public User Profile - Filtered (UC-07)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{userId}}",
+                "profile"
+              ]
+            },
+            "description": "Xem hồ sơ công khai của thành viên khác đã qua bộ lọc quyền riêng tư (UC-07)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Menus & Permissions API",
+      "item": [
+        {
+          "name": "5.1. Get Menus for User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Returns array of menus\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/menus/for-user/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "menus",
+                "for-user",
+                "{{userId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "5.2. Get Permissions for User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Returns array of permissions\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/menus/permissions/for-user/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "menus",
+                "permissions",
+                "for-user",
+                "{{userId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Negative & Security Tests",
+      "item": [
+        {
+          "name": "6.1. Call Protected API without Token (Expected 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 401 Unauthorized\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Dummy123!\",\n  \"newPassword\": \"NewDummy123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "change-password"
+              ]
+            }
+          }
+        },
+        {
+          "name": "6.2. Login with Wrong Password (Expected 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Error message indicates invalid credentials\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.false;",
+                  "    pm.expect(jsonData.message).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userNameOrEmail\": \"{{testUserName}}\",\n  \"password\": \"WrongPassword999@\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "6.3. Register Duplicate Username (Expected 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400 Bad Request\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Error message indicates user already exists\", function () {",
+                  "    pm.expect(jsonData.isSuccess).to.be.false;",
+                  "    pm.expect(jsonData.message).to.include(\"tồn tại\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"{{testUserName}}\",\n  \"email\": \"another_unique_email@devradar.local\",\n  \"password\": \"Password123@\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

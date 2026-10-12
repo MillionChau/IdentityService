@@ -17,6 +17,7 @@ public class IdentityDbContext : DbContext
     public DbSet<UserExternalLogin> UserExternalLogins => Set<UserExternalLogin>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Menu> Menus => Set<Menu>();
+    public DbSet<UserPrivacySetting> UserPrivacySettings => Set<UserPrivacySetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -90,6 +91,17 @@ public class IdentityDbContext : DbContext
             b.HasKey(m => m.Id);
             b.HasIndex(m => m.Code).IsUnique();
             b.HasOne(m => m.Parent).WithMany(p => p.Children).HasForeignKey(m => m.ParentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<UserPrivacySetting>(b =>
+        {
+            b.ToTable("UserPrivacySettings");
+            b.HasKey(p => p.Id);
+            b.HasIndex(p => p.UserId).IsUnique();
+            b.HasOne(p => p.User)
+                .WithOne(u => u.PrivacySetting)
+                .HasForeignKey<UserPrivacySetting>(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
