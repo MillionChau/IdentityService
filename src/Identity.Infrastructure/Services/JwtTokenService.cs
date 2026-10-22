@@ -17,15 +17,18 @@ public class JwtTokenService : IJwtTokenService
     private readonly JwtSettings _jwtSettings;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRedisCacheService? _redisCacheService;
 
     public JwtTokenService(
         IOptions<JwtSettings> jwtSettings,
         IRefreshTokenRepository refreshTokenRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IRedisCacheService? redisCacheService = null)
     {
         _jwtSettings = jwtSettings.Value;
         _refreshTokenRepository = refreshTokenRepository;
         _unitOfWork = unitOfWork;
+        _redisCacheService = redisCacheService;
     }
 
     public async Task<AuthResponseDto> GenerateTokensAsync(
@@ -110,6 +113,22 @@ public class JwtTokenService : IJwtTokenService
             Permissions = permissions.ToList(),
             CreatedAt = user.CreatedAt
         };
+
+        // Cache in Redis (TTL: RefreshTokenExpirationDays & profile)
+        if (_redisCacheService != null)
+        {
+            await _redisCacheService.SetAsync(
+                $"refresh_token:{refreshTokenString}",
+                new { UserId = user.Id, JwtId = jti, ExpiryDate = refreshToken.ExpiryDate },
+                TimeSpan.FromDays(_jwtSettings.RefreshTokenExpirationDays),
+                cancellationToken);
+
+            await _redisCacheService.SetAsync(
+                $"user:profile:{user.Id}",
+                userDto,
+                TimeSpan.FromMinutes(30),
+                cancellationToken);
+        }
 
         return new AuthResponseDto
         {

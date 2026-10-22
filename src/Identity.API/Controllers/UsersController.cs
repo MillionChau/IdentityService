@@ -1,16 +1,19 @@
 using Identity.Application.Common.Models;
 using Identity.Application.DTOs;
+using Identity.Application.Features.Privacy.Commands.UpdateUserPrivacy;
+using Identity.Application.Features.Privacy.Queries.GetMyPrivacySettings;
 using Identity.Application.Features.Users.Commands.DeleteUser;
 using Identity.Application.Features.Users.Commands.LockUser;
 using Identity.Application.Features.Users.Commands.UnlockUser;
 using Identity.Application.Features.Users.Commands.UpdateUser;
+using Identity.Application.Features.Users.Commands.UploadAvatar;
+using Identity.Application.Features.Users.Commands.UploadCover;
 using Identity.Application.Features.Users.Queries.GetUserById;
 using Identity.Application.Features.Users.Queries.GetUsersByFilter;
-using Identity.Application.Features.Privacy.Commands.UpdateUserPrivacy;
-using Identity.Application.Features.Privacy.Queries.GetMyPrivacySettings;
 using Identity.Application.Features.Users.Queries.GetUserPublicProfile;
 using Identity.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Identity.API.Controllers;
@@ -149,5 +152,69 @@ public class UsersController : ApiControllerBase
     {
         var result = await Mediator.Send(new GetUserPublicProfileQuery(id), cancellationToken);
         return Ok(ResponseModel<PublicUserProfileDto>.Success(result));
+    }
+
+    /// <summary>
+    /// Tải lên và cập nhật ảnh đại diện người dùng lên MinIO S3 (Nén WebP 256x256)
+    /// </summary>
+    [HttpPost("me/avatar")]
+    [Authorize]
+    [ProducesResponseType(typeof(ResponseModel<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ResponseModel<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UploadAvatar(IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(ResponseModel<object>.Failure("Vui lòng chọn một tệp hình ảnh hợp lệ."));
+
+        if (file.Length > 5 * 1024 * 1024)
+            return BadRequest(ResponseModel<object>.Failure("Dung lượng ảnh đại diện không được vượt quá 5MB."));
+
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!allowedExtensions.Contains(ext))
+            return BadRequest(ResponseModel<object>.Failure("Định dạng tệp không được hỗ trợ. Vui lòng chọn ảnh JPG, PNG, WEBP hoặc GIF."));
+
+        await using var stream = file.OpenReadStream();
+        var command = new UploadAvatarCommand
+        {
+            FileStream = stream,
+            FileName = file.FileName,
+            ContentType = file.ContentType
+        };
+
+        var avatarUrl = await Mediator.Send(command, cancellationToken);
+        return Ok(ResponseModel<string>.Success(avatarUrl, "Cập nhật ảnh đại diện thành công."));
+    }
+
+    /// <summary>
+    /// Tải lên ảnh bìa (Cover Banner) trang cá nhân lên MinIO S3 (Nén WebP 1200x400)
+    /// </summary>
+    [HttpPost("me/cover")]
+    [Authorize]
+    [ProducesResponseType(typeof(ResponseModel<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ResponseModel<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UploadCover(IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(ResponseModel<object>.Failure("Vui lòng chọn một tệp hình ảnh hợp lệ."));
+
+        if (file.Length > 8 * 1024 * 1024)
+            return BadRequest(ResponseModel<object>.Failure("Dung lượng ảnh bìa không được vượt quá 8MB."));
+
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!allowedExtensions.Contains(ext))
+            return BadRequest(ResponseModel<object>.Failure("Định dạng tệp không được hỗ trợ. Vui lòng chọn ảnh JPG, PNG, WEBP hoặc GIF."));
+
+        await using var stream = file.OpenReadStream();
+        var command = new UploadCoverCommand
+        {
+            FileStream = stream,
+            FileName = file.FileName,
+            ContentType = file.ContentType
+        };
+
+        var coverUrl = await Mediator.Send(command, cancellationToken);
+        return Ok(ResponseModel<string>.Success(coverUrl, "Cập nhật ảnh bìa thành công."));
     }
 }

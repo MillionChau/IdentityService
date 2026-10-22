@@ -29,23 +29,32 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, T
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IPermissionRepository _permissionRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IRedisCacheService _redisCacheService;
 
     public RefreshTokenCommandHandler(
         IRefreshTokenRepository refreshTokenRepository,
         IUserRepository userRepository,
         IJwtTokenService jwtTokenService,
         IPermissionRepository permissionRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IRedisCacheService redisCacheService)
     {
         _refreshTokenRepository = refreshTokenRepository;
         _userRepository = userRepository;
         _jwtTokenService = jwtTokenService;
         _permissionRepository = permissionRepository;
         _unitOfWork = unitOfWork;
+        _redisCacheService = redisCacheService;
     }
 
     public async Task<TokenDto> Handle(RefreshTokenCommand request, CancellationToken cancellationToken)
     {
+        if (await _redisCacheService.IsTokenBlacklistedAsync(request.RefreshToken, cancellationToken) ||
+            await _redisCacheService.IsTokenBlacklistedAsync(request.AccessToken, cancellationToken))
+        {
+            throw new BadRequestException("Token đã bị thu hồi.");
+        }
+
         var principal = _jwtTokenService.GetPrincipalFromExpiredToken(request.AccessToken);
         if (principal == null)
         {
