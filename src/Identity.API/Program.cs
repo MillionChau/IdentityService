@@ -58,6 +58,10 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<Identity.Infrastructure.Persistence.IdentityDbContext>();
     db.Database.Migrate();
+
+    var passwordHasher = scope.ServiceProvider.GetRequiredService<Identity.Application.Common.Interfaces.IPasswordHasher>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    Identity.Infrastructure.Persistence.IdentityDataSeeder.SeedAsync(db, passwordHasher, logger).GetAwaiter().GetResult();
 }
 
 app.Run();

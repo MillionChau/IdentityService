@@ -405,3 +405,8 @@ ehthumbs_vista.db
 $RECYCLE.BIN/
 *.lnk
 *.swp
+
+# Documentation
+*.md
+!README.md
+

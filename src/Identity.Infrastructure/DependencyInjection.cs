@@ -10,7 +10,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using StackExchange.Redis;
 
 namespace Identity.Infrastructure;
 
@@ -21,6 +23,7 @@ public static class DependencyInjection
         // Settings configuration
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.Configure<OAuthSettings>(configuration.GetSection(OAuthSettings.SectionName));
+        services.Configure<MinioStorageSettings>(configuration.GetSection(MinioStorageSettings.SectionName));
 
         var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>() ?? new JwtSettings();
 
@@ -34,6 +37,28 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString)
                    .AddInterceptors(interceptor);
         });
+
+        // Redis Connection & Cache Service
+        services.AddSingleton<IConnectionMultiplexer>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<RedisCacheService>>();
+            var redisConn = configuration.GetConnectionString("Redis") 
+                            ?? configuration["ConnectionStrings:Redis"] 
+                            ?? "localhost:6379";
+            try
+            {
+                var options = ConfigurationOptions.Parse(redisConn);
+                options.AbortOnConnectFail = false;
+                options.ConnectRetry = 3;
+                return ConnectionMultiplexer.Connect(options);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Could not connect to Redis at {RedisConn}. In-memory fallback will be active.", redisConn);
+                return null!;
+            }
+        });
+        services.AddSingleton<IRedisCacheService, RedisCacheService>();
 
         // Repositories & Unit of work
         services.AddScoped(typeof(IRepository<>), typeof(BaseRepository<>));
@@ -51,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IOAuthService, OAuthService>();
+        services.AddScoped<IStorageService, MinioStorageService>();
 
         // JWT Bearer Authentication
         services.AddAuthentication(options =>
@@ -72,6 +98,21 @@ public static class DependencyInjection
                 ValidAudience = jwtSettings.Audience,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
                 ClockSkew = TimeSpan.Zero
+            };
+
+            options.Events = new JwtBearerEvents
+            {
+                OnTokenValidated = async context =>
+                {
+                    var redisCache = context.HttpContext.RequestServices.GetRequiredService<IRedisCacheService>();
+                    var authHeader = context.Request.Headers.Authorization.ToString();
+                    var token = authHeader.Replace("Bearer ", string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
+
+                    if (!string.IsNullOrEmpty(token) && await redisCache.IsTokenBlacklistedAsync(token))
+                    {
+                        context.Fail("Token đã bị vô hiệu hóa / thu hồi.");
+                    }
+                }
             };
         });
 
